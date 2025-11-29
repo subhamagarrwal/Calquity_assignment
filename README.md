@@ -1,4 +1,5 @@
 ##Calquity Assignment
+This involves providing a corpus of documents and implementing a search functionality , query expansion, returing with text and generative ui elements using groq client.
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
