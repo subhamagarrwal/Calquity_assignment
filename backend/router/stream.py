@@ -19,6 +19,7 @@ async def process_job_stream(job_id: str) -> AsyncGenerator[str, None]:
         yield f"event: error\ndata: {json.dumps({'message': 'Job not found'})}\n\n"
         return
     
+    # start processing
     query = job["query"]
     job_queue.set_status(job_id, "processing")
     

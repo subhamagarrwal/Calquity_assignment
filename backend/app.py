@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 #Import router
-from router import ask
+from router import ask, stream  
 
 # Load environment variables
 dotenv.load_dotenv()
@@ -16,6 +16,11 @@ app = FastAPI(
     description="Generative UI + RAG + Citations API",
     version="1.0.0"
 )
+
+#include routers
+app.include_router(ask.router)
+app.include_router(stream.router)
+
 
 # CORS Configuration
 app.add_middleware(
