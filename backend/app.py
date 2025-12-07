@@ -1,99 +1,82 @@
-import dotenv
+from dotenv import load_dotenv
 import os
+
+# Load .env BEFORE importing anything else
+load_dotenv()
+print(f"🔑 GROQ_API_KEY loaded: {bool(os.getenv('GROQ_API_KEY'))}")
+print(f"📋 GROQ_MODEL: {os.getenv('GROQ_MODEL')}")
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
+from router import ask, stream, upload
+from services.pdf_loader import pdf_loader
+import shutil
+import atexit
 
-#Import router
-from router import ask, stream  
+app = FastAPI(title="Calquity Backend")
 
-# Load environment variables
-dotenv.load_dotenv()
-
-# Initialize FastAPI app
-app = FastAPI(
-    title="Calquity API",
-    description="Generative UI + RAG + Citations API",
-    version="1.0.0"
-)
-
-#include routers
-app.include_router(ask.router)
-app.include_router(stream.router)
-
-
-# CORS Configuration
+# CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        os.getenv("FRONTEND_URL", "http://localhost:3000"),
-        "http://localhost:3000",
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Health check endpoint
-@app.get("/")
-async def root():
-    return {
-        "status": "ok",
-        "message": "Calquity API is running",
-        "groq_configured": bool(os.getenv("GROQ_API_KEY")),
-        "endpoints":{
-            "create_job": "POST /ask",
-            "job_status": "GET /ask/{job_id}",
-            "stream":"GET /stream/{job_id}"
-        }
-    }
+# Clean temp directory on startup
+def cleanup_temp_files():
+    """Delete temporary PDF storage on app start"""
+    if os.path.exists(pdf_loader.calquity_dir):
+        try:
+            shutil.rmtree(pdf_loader.calquity_dir)
+            print(f"🧹 Cleaned temp directory: {pdf_loader.calquity_dir}")
+        except Exception as e:
+            print(f"⚠️ Failed to clean temp: {str(e)}")
+    
+    os.makedirs(pdf_loader.calquity_dir, exist_ok=True)
+
+# Clean on startup
+cleanup_temp_files()
+
+# Also clean on shutdown
+def cleanup_on_exit():
+    """Clean up when app shuts down"""
+    if os.path.exists(pdf_loader.calquity_dir):
+        try:
+            shutil.rmtree(pdf_loader.calquity_dir)
+            print(f"🧹 Cleaned temp on exit: {pdf_loader.calquity_dir}")
+        except Exception:
+            pass
+
+atexit.register(cleanup_on_exit)
+
+# Include routers
+app.include_router(ask.router)
+app.include_router(stream.router)
+app.include_router(upload.router)
 
 @app.get("/health")
-async def health_check():
+async def health():
     return {
-        "status": "healthy",
-        "backend": "running",
-        "version": "1.0.0"
+        "status": "ok",
+        "groq_configured": bool(os.getenv("GROQ_API_KEY")),
+        "groq_model": os.getenv("GROQ_MODEL")
     }
 
-# Test Groq endpoint
-@app.get("/test-groq")
-async def test_groq():
-    from groq import Groq
-    
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        return {"error": "GROQ_API_KEY not configured"}
-    
-    try:
-        client = Groq(api_key=api_key)
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[{"role": "user", "content": "Say 'working' in one word"}],
-            max_tokens=10
-        )
-        return {
-            "status": "success",
-            "response": response.choices[0].message.content
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e)
-        }
-
-# Run server
 if __name__ == "__main__":
-    host = os.getenv("BACKEND_HOST", "0.0.0.0")
-    port = int(os.getenv("BACKEND_PORT", 8000))
+    import uvicorn
     
-    print(f" Starting backendon {host}:{port}")
-    print("Groq API Key: {'✓ Configured' if os.getenv('GROQ_API_KEY') else '✗ Not Set'}")
+    # Check if API key is set
+    if not os.getenv("GROQ_API_KEY"):
+        print("\n" + "="*60)
+        print("⚠️  WARNING: GROQ_API_KEY is not set!")
+        print("="*60)
+        print("Get your free API key from: https://console.groq.com/keys")
+        print("Then add it to backend/.env file:")
+        print('GROQ_API_KEY=gsk_your_key_here')
+        print("="*60 + "\n")
+    else:
+        print(f"✅ GROQ_API_KEY is configured")
     
-    uvicorn.run(
-        "app:app",
-        host=host,
-        port=port,
-        reload=True,
-        log_level="info"
-    )
+    uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse 
 from job_queue.queue import job_queue
+from services.rag import rag_system
+from services.llm import llm_service
 import json
 import asyncio
 from typing import AsyncGenerator
@@ -11,7 +13,7 @@ router = APIRouter(
 )
 
 async def process_job_stream(job_id: str) -> AsyncGenerator[str, None]:
-    """Process job and stream SSE events"""
+    """Process job and stream SSE events with components"""
     
     job = job_queue.get_job(job_id)
     
@@ -19,53 +21,89 @@ async def process_job_stream(job_id: str) -> AsyncGenerator[str, None]:
         yield f"event: error\ndata: {json.dumps({'message': 'Job not found'})}\n\n"
         return
     
-    # start processing
     query = job["query"]
     job_queue.set_status(job_id, "processing")
     
     try:
-        # Step 1: Searching
+        # Step 1: Searching documents
         yield f"event: tool_call\ndata: {json.dumps({'message': '🔍 Searching documents...'})}\n\n"
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.1)
         
-        # Step 2: Reading
-        yield f"event: tool_call\ndata: {json.dumps({'message': '📄 Reading PDF pages...'})}\n\n"
-        await asyncio.sleep(1)
+        # Retrieve relevant chunks
+        context_chunks = rag_system.retrieve(query, top_k=3)
         
-        # Step 3: Analyzing
+        if not context_chunks:
+            yield f"event: tool_call\ndata: {json.dumps({'message': '⚠️ No documents found. Please upload PDFs first.'})}\n\n"
+            yield f"data: {json.dumps({'text': 'No documents available. Please upload PDFs to get started.'})}\n\n"
+            job_queue.set_status(job_id, "completed")
+            yield f"event: end\ndata: {json.dumps({'done': True})}\n\n"
+            return
+        
+        # Step 2: Reading relevant pages
+        yield f"event: tool_call\ndata: {json.dumps({'message': f'📄 Found {len(context_chunks)} relevant pages'})}\n\n"
+        await asyncio.sleep(0.1)
+        
+        # Step 3: Analyzing content
         yield f"event: tool_call\ndata: {json.dumps({'message': '🔎 Analyzing content...'})}\n\n"
-        await asyncio.sleep(0.8)
+        await asyncio.sleep(0.1)
         
-        # Step 4: Generating
+        # Step 4: Generating response
         yield f"event: tool_call\ndata: {json.dumps({'message': '🤖 Generating response...'})}\n\n"
-        await asyncio.sleep(0.5)
         
-        # Step 5: Stream response
-        response_text = (
-            f"Based on your query: '{query}', here is what I found. "
-            "This is a Phase 3 test response demonstrating SSE streaming. "
-            "In Phase 6, this will be replaced with real LLM output from Groq. "
-            "The system is working correctly and streaming word-by-word."
-        )
+        # Step 5: Stream LLM response
+        full_response = ""
+        token_count = 0
         
-        words = response_text.split()
-        for word in words:
-            yield f"data: {json.dumps({'text': word + ' '})}\n\n"
-            await asyncio.sleep(0.05)
+        print(f"🔄 Starting LLM stream for job {job_id[:8]}...")
         
-        yield f"data: {json.dumps({'text': '\\n'})}\n\n"
+        async for token in llm_service.stream_response(query, context_chunks):
+            full_response += token
+            token_count += 1
+            
+            # Send each token immediately
+            yield f"data: {json.dumps({'text': token})}\n\n"
+            
+            # Debug every 10 tokens
+            if token_count % 10 == 0:
+                print(f"   Streamed {token_count} tokens...")
+        
+        print(f"✓ Completed streaming {token_count} tokens")
+        print(f"📝 Full response length: {len(full_response)}")
+        
+        # Step 6: Extract and send citations
+        citations = llm_service.extract_citations(full_response)
+        if citations:
+            print(f"📚 Found {len(citations)} citations")
+            yield f"event: tool_call\ndata: {json.dumps({'message': '📚 Found citations'})}\n\n"
+            
+            for citation in citations:
+                yield f"event: citation\ndata: {json.dumps(citation)}\n\n"
+        
+        # Step 7: Extract and send components
+        components = llm_service.extract_components(full_response)
+        if components:
+            print(f"📊 Found {len(components)} components")
+            yield f"event: tool_call\ndata: {json.dumps({'message': '📊 Generating visualizations...'})}\n\n"
+            
+            for component in components:
+                print(f"   Sending component: {component.get('name', 'unknown')}")
+                yield f"event: component\ndata: {json.dumps(component)}\n\n"
         
         # Mark complete
         job_queue.set_status(job_id, "completed")
+        job_queue.update_job(job_id, {"response": full_response})
         yield f"event: end\ndata: {json.dumps({'done': True})}\n\n"
         
         print(f"✓ Job {job_id[:8]}... completed")
         
     except Exception as e:
+        print(f"✗ Error in job {job_id[:8]}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
         job_queue.set_status(job_id, "error")
         job_queue.update_job(job_id, {"error": str(e)})
         yield f"event: error\ndata: {json.dumps({'message': str(e)})}\n\n"
-        print(f"✗ Job {job_id[:8]}... failed: {str(e)}")
 
 @router.get("/{job_id}")
 async def stream_job_results(job_id: str):

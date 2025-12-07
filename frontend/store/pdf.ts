@@ -4,9 +4,8 @@ interface PDFStore {
   isOpen: boolean;
   pdfId: string | null;
   page: number;
-  snippet: string | null;
-
-  openPDF: (pdfId: string, page?: number, snippet?: string) => void;
+  snippet: string;
+  openPDF: (id: string, page: number, snippet?: string) => void;
   closePDF: () => void;
   setPage: (page: number) => void;
 }
@@ -15,13 +14,14 @@ export const usePDFStore = create<PDFStore>((set) => ({
   isOpen: false,
   pdfId: null,
   page: 1,
-  snippet: null,
-
-  openPDF: (pdfId, page = 1, snippet = null) =>
-    set({ isOpen: true, pdfId, page, snippet }),
-
+  snippet: '',
+  
+  openPDF: (id, page, snippet = '') =>
+    set({ isOpen: true, pdfId: id, page, snippet }),
+  
   closePDF: () =>
-    set({ isOpen: false, pdfId: null, page: 1, snippet: null }),
-
-  setPage: (page) => set({ page }),
+    set({ isOpen: false, pdfId: null, page: 1, snippet: '' }),
+  
+  setPage: (page) =>
+    set({ page }),
 }));
