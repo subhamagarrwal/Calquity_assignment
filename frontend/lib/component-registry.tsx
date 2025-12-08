@@ -39,14 +39,14 @@ export function renderComponent(name: string, props: Record<string, any>): React
   const Component = componentRegistry[name];
   
   if (!Component) {
-    console.warn(`⚠️ Component not found: ${name}`);
+    console.warn(`Component not found: ${name}`);
     return null;
   }
 
   try {
     return <Component {...props} />;
   } catch (error) {
-    console.error(`❌ Error rendering ${name}:`, error);
+    console.error(`Error rendering ${name}:`, error);
     return null;
   }
 }

@@ -56,13 +56,13 @@ class RAGSystem:
         print(f"✓ Added {len(documents)} chunks from {pdf_name}")
     
     def search(self, query: str, k: int = 5) -> List[Dict]:
-        """Search for relevant document chunks (alias for retrieve)"""
+        """Search for document chunks"""
         return self.retrieve(query, top_k=k)
     
     def retrieve(self, query: str, top_k: int = 3) -> List[Dict]:
         """Retrieve most relevant document chunks"""
         if self.collection.count() == 0:
-            print("⚠️ No documents in collection")
+            print("No documents in collection")
             return []
         
         results = self.collection.query(
@@ -79,7 +79,7 @@ class RAGSystem:
                 "score": results['distances'][0][i] if 'distances' in results else 1.0
             })
         
-        print(f"✓ Retrieved {len(retrieved)} chunks for query: '{query[:50]}...'")
+        print(f"Retrieved {len(retrieved)} chunks for query: '{query[:50]}...'")
         return retrieved
     
     def get_all_documents(self) -> List[str]:
@@ -103,7 +103,7 @@ class RAGSystem:
         
         if ids_to_delete:
             self.collection.delete(ids=ids_to_delete)
-            print(f"✓ Deleted {len(ids_to_delete)} chunks from {pdf_name}")
+            print(f"Deleted {len(ids_to_delete)} chunks from {pdf_name}")
 
     def clear_all(self):
         """Clear all documents from the collection"""
@@ -113,9 +113,9 @@ class RAGSystem:
                 name=self.collection_name,
                 metadata={"hnsw:space": "cosine"}
             )
-            print("🧹 RAG system cleared")
+            print("  RAG system cleared")
         except Exception as e:
-            print(f"✗ Error clearing RAG: {str(e)}")
+            print(f"Error clearing RAG: {str(e)}")
 
-# Initialize global RAG system
+
 rag_system = RAGSystem()

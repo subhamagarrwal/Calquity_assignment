@@ -11,7 +11,7 @@ class PDFLoader:
         self.upload_dir = tempfile.gettempdir()
         self.calquity_dir = os.path.join(self.upload_dir, 'calquity_uploads')
         os.makedirs(self.calquity_dir, exist_ok=True)
-        print(f"✓ PDF Loader initialized (temp dir: {self.calquity_dir})")
+        print(f"PDF Loader initialized (temp dir: {self.calquity_dir})")
     
     def extract_text(self, pdf_path: str, chunk_size: int = 500) -> List[Dict]:
         """Extract text from PDF and split into chunks"""

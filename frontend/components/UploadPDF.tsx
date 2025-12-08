@@ -15,7 +15,7 @@ export function UploadPDF() {
     if (!file) return;
 
     if (!file.name.endsWith('.pdf')) {
-      setMessage('❌ Only PDF files are allowed');
+      setMessage('Only PDF files are allowed');
       return;
     }
 
@@ -45,14 +45,14 @@ export function UploadPDF() {
       }
 
       const data = await res.json();
-      setMessage(`✅ Uploaded ${data.filename} (${data.pages} pages)`);
+      setMessage(` Uploaded ${data.filename} (${data.pages} pages)`);
       
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      setMessage(`❌ ${errorMessage}`);
+      setMessage(` ${errorMessage}`);
     } finally {
       setUploading(false);
       setTimeout(() => setProgress(0), 2000);

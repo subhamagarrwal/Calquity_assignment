@@ -1,9 +1,5 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-/**
- * Get a screenshot of a PDF page as base64
- * Uses the backend to render PDF pages
- */
 export async function getPDFPageScreenshot(
   filename: string, 
   page: number

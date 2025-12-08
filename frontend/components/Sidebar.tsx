@@ -100,7 +100,7 @@ export function Sidebar() {
   };
 
   const handleDocumentClick = (filename: string) => {
-    console.log('📄 Sidebar: Opening PDF', filename);
+    console.log('Sidebar: Opening PDF', filename);
     // Dispatch event to open PDF viewer
     window.dispatchEvent(new CustomEvent('open-pdf', {
       detail: { filename, page: 1 }

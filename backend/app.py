@@ -2,8 +2,8 @@ from dotenv import load_dotenv
 import os
 
 load_dotenv()
-print(f"🔑 GROQ_API_KEY loaded: {bool(os.getenv('GROQ_API_KEY'))}")
-print(f"📋 GROQ_MODEL: {os.getenv('GROQ_MODEL')}")
+print(f"GROQ_API_KEY loaded: {bool(os.getenv('GROQ_API_KEY'))}")
+print(f" GROQ_MODEL: {os.getenv('GROQ_MODEL')}")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -70,10 +70,8 @@ async def health():
 
 if __name__ == "__main__":
     if not os.getenv("GROQ_API_KEY"):
-        print("\n" + "="*60)
-        print("⚠️  WARNING: GROQ_API_KEY is not set!")
-        print("="*60 + "\n")
+        print(" WARNING: GROQ_API_KEY is not set!")
     else:
-        print(f"✅ GROQ_API_KEY is configured")
+        print(f" GROQ_API_KEY is configured")
     
     uvicorn.run(app, host="0.0.0.0", port=8000)

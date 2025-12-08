@@ -69,5 +69,4 @@ class JobManager:
         if to_delete:
             print(f"🧹 Cleaned up {len(to_delete)} old jobs")
 
-# Singleton instance
 job_manager = JobManager()

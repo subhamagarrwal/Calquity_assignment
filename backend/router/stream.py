@@ -20,7 +20,7 @@ async def create_job(request: QueryRequest):
     return {"job_id": job_id, "status": "created"}
 
 async def process_job_stream(job_id: str) -> AsyncGenerator[str, None]:
-    """Process job and stream results with numbered citations"""
+    """Process job and stream results with text + visualization"""
     
     try:
         job = job_manager.get_job(job_id)
@@ -51,43 +51,40 @@ async def process_job_stream(job_id: str) -> AsyncGenerator[str, None]:
         yield f"event: tool_call\ndata: {json.dumps({'message': '🔎 Analyzing content...'})}\n\n"
         await asyncio.sleep(0.1)
         
-        # Step 4: Generate response
+        # Step 4: Generate response with streaming
         yield f"event: tool_call\ndata: {json.dumps({'message': '🤖 Generating response...'})}\n\n"
         
-        full_response = ""
         token_count = 0
+        citation_count = 0
+        component_sent = False
         
-        print(f"🔄 Starting LLM stream for job {job_id[:8]}...")
+        print(f"🔄 Starting combined stream for job {job_id[:8]}...")
         
-        async for token in llm_service.stream_response(query, chunks):
-            full_response += token
-            token_count += 1
-            yield f"event: text\ndata: {json.dumps(token)}\n\n"
+        # Use the new combined streaming method
+        async for item in llm_service.stream_with_visualization(query, chunks):
+            item_type = item.get("type")
+            content = item.get("content")
             
-            if token_count % 10 == 0:
-                print(f"   Streamed {token_count} tokens...")
-        
-        print(f"✓ Completed streaming {token_count} tokens")
-        
-        # Step 5: Extract citations with full data
-        citations = llm_service.extract_citations(full_response, chunks)
-        
-        if citations:
-            yield f"event: tool_call\ndata: {json.dumps({'message': '📚 Found citations'})}\n\n"
+            if item_type == "text":
+                token_count += 1
+                yield f"event: text\ndata: {json.dumps(content)}\n\n"
+                if token_count % 20 == 0:
+                    print(f"   Streamed {token_count} tokens...")
             
-            # Send each citation with full data
-            for citation in citations:
-                yield f"event: citation\ndata: {json.dumps(citation)}\n\n"
+            elif item_type == "citation":
+                citation_count += 1
+                yield f"event: citation\ndata: {json.dumps(content)}\n\n"
             
-            print(f"📚 Found {len(citations)} citations")
+            elif item_type == "component" and not component_sent:
+                component_sent = True
+                yield f"event: tool_call\ndata: {json.dumps({'message': '📊 Creating visualization...'})}\n\n"
+                yield f"event: component\ndata: {json.dumps(content)}\n\n"
+                print(f"📊 Sent visualization: {content.get('component', 'Unknown')}")
+            
+            elif item_type == "error":
+                yield f"event: error\ndata: {content}\n\n"
         
-        # Step 6: Generate component
-        components = llm_service.extract_components(full_response, query, citations)
-        if components:
-            yield f"event: tool_call\ndata: {json.dumps({'message': '📊 Generating visualizations...'})}\n\n"
-            
-            for component in components:
-                yield f"event: component\ndata: {json.dumps(component)}\n\n"
+        print(f"✓ Stream complete: {token_count} tokens, {citation_count} citations")
         
         job_manager.update_status(job_id, "completed")
         yield f"event: end\ndata: complete\n\n"

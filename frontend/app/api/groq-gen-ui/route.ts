@@ -1,29 +1,43 @@
 import { groq } from '@ai-sdk/groq';
-import { generateText, generateObject } from 'ai';
+import { generateText } from 'ai';
 import { NextRequest } from 'next/server';
-import { z } from 'zod';
 
-// Schema for UI component generation
-const UIComponentSchema = z.object({
-  component: z.enum(['InfoCard', 'BarChart', 'LineChart', 'PieChart', 'Table', 'MetricCard']),
-  props: z.object({
-    title: z.string(),
-    // For InfoCard/MetricCard
-    value: z.string().optional(),
-    change: z.string().optional(),
-    icon: z.string().optional(),
-    color: z.enum(['blue', 'green', 'red', 'yellow', 'purple', 'orange']).optional(),
-    // For Charts
-    data: z.array(z.object({
-      label: z.string(),
-      value: z.number(),
-      color: z.string().optional(),
-    })).optional(),
-    // For Table
-    headers: z.array(z.string()).optional(),
-    rows: z.array(z.array(z.string())).optional(),
-  }),
-});
+// Llama 4 multimodal models for vision tasks
+const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+const TEXT_MODEL = 'llama-3.3-70b-versatile';
+
+// Enhanced schema for UI component generation
+const componentPrompt = `You are a financial data visualization expert. Your job is to extract REAL numerical data from documents and create meaningful visualizations.
+
+CRITICAL RULES:
+1. Extract ACTUAL numbers, percentages, and values - NEVER use placeholder text
+2. If you find financial data (revenue, profit, growth), use BarChart or MetricCard
+3. If you find percentages or distributions, use PieChart  
+4. If you find comparisons or multiple metrics, use Table
+5. Each data point must have a real numerical value extracted from the source
+
+Available components:
+
+1. MetricCard - For a key metric with change indicator
+   {"component": "MetricCard", "props": {"title": "Revenue Growth", "value": "₹2,34,500 Cr", "change": "+15.2%", "color": "green"}}
+
+2. BarChart - For comparing values (MUST have 3+ real data points)
+   {"component": "BarChart", "props": {"title": "Quarterly Revenue", "data": [{"label": "Q1 FY24", "value": 12500}, {"label": "Q2 FY24", "value": 14200}, {"label": "Q3 FY24", "value": 15800}]}}
+
+3. LineChart - For trends over time with real numbers
+   {"component": "LineChart", "props": {"title": "Stock Price", "data": [{"label": "Jan", "value": 2450}, {"label": "Feb", "value": 2520}]}}
+
+4. PieChart - For proportions (values are percentages that should sum meaningfully)
+   {"component": "PieChart", "props": {"title": "Revenue Mix", "data": [{"label": "Digital", "value": 45}, {"label": "Retail", "value": 30}, {"label": "Energy", "value": 25}]}}
+
+5. Table - For structured comparisons
+   {"component": "Table", "props": {"title": "Financial Metrics", "headers": ["Metric", "Value", "Change"], "rows": [["Revenue", "₹2.3L Cr", "+15%"], ["EBITDA", "₹58K Cr", "+11%"]]}}
+
+6. InfoCard - ONLY if no numerical data exists (LAST RESORT)
+   {"component": "InfoCard", "props": {"title": "Summary", "value": "Key Finding", "icon": "📊"}}
+
+PRIORITY: BarChart > Table > MetricCard > PieChart > LineChart > InfoCard
+Respond with ONLY valid JSON, no markdown or explanation.`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,133 +50,142 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log('🎨 Generating UI component...');
+    console.log('🎨 Generating visualization with enhanced prompting...');
 
-    // If we have an image, use vision model for better analysis
+    // Build rich context from citations
+    let citationsContext = '';
+    if (citations?.length) {
+      citationsContext = '\n\nSOURCE EXCERPTS:\n' + citations
+        .map((c: { number: number; source: string; page: number; excerpt: string }) => 
+          `[${c.number}] ${c.source} p.${c.page}: ${c.excerpt || ''}`
+        )
+        .join('\n');
+    }
+
+    // If we have an image, use Llama 4 vision model
     if (imageBase64) {
-      console.log('🖼️ Using vision model for image analysis...');
+      console.log('🖼️ Using Llama 4 Scout for image analysis...');
 
-      const { text } = await generateText({
-        model: groq('llama-3.2-90b-vision-preview'),
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `Analyze this document page and generate a visualization component.
+      try {
+        const { text } = await generateText({
+          model: groq(VISION_MODEL),
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: `${componentPrompt}
 
-User asked: "${query}"
+User question: "${query}"
 
-Based on the image, create a JSON response for a UI component:
-Ensure the design is minimalist and uses clean colors (e.g., blue, black, gray).
+Look at this document image and extract specific numerical data:
+- Look for tables, charts, or financial figures
+- Extract exact numbers, percentages, currency values
+- Focus on data that answers the user's question
+- Create a visualization with at least 3 real data points
 
-Available components:
-1. InfoCard - For single key metrics
-   {"component": "InfoCard", "props": {"title": "...", "value": "...", "icon": "📊", "color": "blue"}}
+Respond with ONLY valid JSON for the component.`,
+                },
+                {
+                  type: 'image',
+                  image: `data:image/png;base64,${imageBase64}`,
+                },
+              ],
+            },
+          ],
+        });
 
-2. BarChart - For comparing values
-   {"component": "BarChart", "props": {"title": "...", "data": [{"label": "Q1", "value": 100}]}}
-
-3. LineChart - For trends over time
-   {"component": "LineChart", "props": {"title": "...", "data": [{"label": "Jan", "value": 50}]}}
-
-4. PieChart - For proportions
-   {"component": "PieChart", "props": {"title": "...", "data": [{"label": "A", "value": 30}]}}
-
-5. Table - For structured data
-   {"component": "Table", "props": {"title": "...", "headers": ["Col1"], "rows": [["val1"]]}}
-
-6. MetricCard - For key metric with change indicator
-   {"component": "MetricCard", "props": {"title": "...", "value": "₹1,234 Cr", "change": "+15%", "color": "green"}}
-
-Extract real data from the image. Respond with ONLY valid JSON.`,
-              },
-              {
-                type: 'image',
-                image: `data:image/png;base64,${imageBase64}`,
-              },
-            ],
-          },
-        ],
-      });
-
-      // Parse JSON from response
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const componentData = JSON.parse(jsonMatch[0]);
-        console.log('✅ Vision-based component generated:', componentData.component);
-        return Response.json(componentData);
+        // Parse JSON from response
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const componentData = JSON.parse(jsonMatch[0]);
+          
+          // Validate the component has real data
+          const props = componentData.props || {};
+          const compType = componentData.component;
+          
+          if (compType === 'BarChart' || compType === 'LineChart' || compType === 'PieChart') {
+            const data = props.data || [];
+            if (data.length >= 2 && data.every((d: {value: number}) => typeof d.value === 'number')) {
+              console.log('✅ Llama 4 vision generated valid chart:', compType);
+              return Response.json(componentData);
+            }
+          } else if (compType === 'Table') {
+            const rows = props.rows || [];
+            if (rows.length >= 1) {
+              console.log('✅ Llama 4 vision generated table');
+              return Response.json(componentData);
+            }
+          } else if (compType === 'MetricCard') {
+            const value = props.value || '';
+            if (/[\d₹$%]/.test(value)) {
+              console.log('✅ Llama 4 vision generated MetricCard');
+              return Response.json(componentData);
+            }
+          }
+          
+          console.log('⚠️ Vision model output invalid, falling back to text model');
+        }
+      } catch (visionError) {
+        console.log('⚠️ Vision model failed:', visionError);
       }
     }
 
-    // Fallback: Use text-based generation
-    const systemPrompt = `You are a UI component generator. Based on the context and query, generate a visualization.
-
-CONTEXT (from documents):
-${context.substring(0, 2000)}
-
-${citations ? `CITATIONS: ${JSON.stringify(citations)}` : ''}
-
-Generate a JSON response for one of these components:
-
-1. InfoCard - Single metric: {"component": "InfoCard", "props": {"title": "...", "value": "...", "icon": "📊", "color": "blue"}}
-
-2. BarChart - Compare values: {"component": "BarChart", "props": {"title": "...", "data": [{"label": "Q1", "value": 100}]}}
-
-3. LineChart - Trends: {"component": "LineChart", "props": {"title": "...", "data": [{"label": "Jan", "value": 50}]}}
-
-4. PieChart - Proportions: {"component": "PieChart", "props": {"title": "...", "data": [{"label": "A", "value": 30, "color": "#8B5CF6"}]}}
-
-5. Table - Structured data: {"component": "Table", "props": {"title": "...", "headers": ["Col1"], "rows": [["val1"]]}}
-
-6. MetricCard - Key metric with change: {"component": "MetricCard", "props": {"title": "...", "value": "₹1,234 Cr", "change": "+15%", "color": "green"}}
-
-Rules:
-- Extract REAL data from context
-- Choose the most appropriate component
-- Use actual numbers, not placeholders
-- Respond with ONLY valid JSON
-- Ensure the design is minimalist and uses clean colors (e.g., blue, black, gray)`;
-
+    // Fallback: Use text-based generation with rich context
+    console.log('📝 Using text model for visualization...');
+    
     const { text } = await generateText({
-      model: groq('llama-3.3-70b-versatile'),
+      model: groq(TEXT_MODEL),
       messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: query }
+        { role: 'system', content: componentPrompt },
+        { 
+          role: 'user', 
+          content: `User Query: "${query}"
+
+Document Content:
+${context.substring(0, 3500)}
+${citationsContext}
+
+Extract REAL numerical data from the above content. Create a BarChart, Table, or MetricCard with actual values.
+DO NOT use placeholder values like "See details" or page numbers.
+Find specific numbers, percentages, or financial figures.
+
+Generate the visualization JSON:`
+        }
       ],
+      temperature: 0.2,
     });
 
     // Parse JSON from response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const componentData = JSON.parse(jsonMatch[0]);
-      console.log('✅ Text-based component generated:', componentData.component);
+      console.log('✅ Text model generated:', componentData.component);
       return Response.json(componentData);
     }
 
-    // Fallback component
+    // Ultimate fallback
+    return Response.json({
+      component: 'InfoCard',
+      props: {
+        title: 'Analysis Complete',
+        value: 'View response for details',
+        icon: '📄',
+        color: 'blue'
+      }
+    });
+
+  } catch (error: unknown) {
+    console.error('❌ UI Generation error:', error);
+
     return Response.json({
       component: 'InfoCard',
       props: {
         title: 'Analysis Complete',
         value: 'See response above',
-        icon: '📊',
-        color: 'blue'
-      }
-    });
-
-  } catch (error: any) {
-    console.error('❌ UI Generation error:', error);
-
-    // Return fallback on error
-    return Response.json({
-      component: 'InfoCard',
-      props: {
-        title: 'Analysis Complete',
-        value: 'View details above',
         icon: '📄',
-        color: 'purple'
+        color: 'gray'
       }
     });
   }

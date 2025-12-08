@@ -289,14 +289,9 @@ function SourceCard({ source, page, excerpt, onClick }: {
 }
 
 export function ChatMessage({ type, content, onCitationClick }: Props) {
-  // Tool calls
+  // Tool calls - hidden now, but keep for backwards compatibility
   if (type === 'tool_call') {
-    return (
-      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg my-2">
-        <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-400 border-t-transparent"></div>
-        <span className="text-xs text-gray-500 font-medium">{content}</span>
-      </div>
-    );
+    return null; // Don't render tool calls - processing indicator handles this
   }
 
   // Citations
