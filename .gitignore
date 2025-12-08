@@ -1,2 +1,4 @@
 /backend/.env
-
+/backend/node_modules
+/backend/services/__pycache__
+/backend/data/chromadb/

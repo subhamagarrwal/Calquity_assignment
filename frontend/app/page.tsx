@@ -4,24 +4,59 @@ import { useState, useRef, useEffect } from 'react';
 import { useChatStore } from '@/store/chat';
 import { connectSSE, disconnectSSE } from '@/lib/sse';
 import { ChatDisplay } from '@/components/ChatDisplay';
-import { PDFViewer } from '@/components/PDFViewer';
+import { PDFViewer, PDFViewerRef } from '@/components/PDFViewer';
 import { Sidebar } from '@/components/Sidebar';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+interface Citation {
+  number: number;
+  source: string;
+  page: number;
+  excerpt: string;
+}
+
 export default function Home() {
   const [input, setInput] = useState('');
   const eventSourceRef = useRef<EventSource | null>(null);
-  const responseTextRef = useRef('');
-  const messageIdRef = useRef<number | null>(null);
+  const accumulatedText = useRef('');
+  const aiMessageIndex = useRef<number>(-1);
+  const pdfViewerRef = useRef<PDFViewerRef>(null);
+  const citationsRef = useRef<Citation[]>([]);
 
-  const { addMessage, updateLastMessage, setJobId, setStreaming, setError, reset, isStreaming } =
+  const { messages, addMessage, setJobId, setStreaming, setError, reset, isStreaming } =
     useChatStore();
 
-  // Clear chat on mount
   useEffect(() => {
     reset();
+    
+    // Listen for citation clicks from inline markers
+    const handleCitationClick = (e: CustomEvent<{ number: number }>) => {
+      const citation = citationsRef.current.find(c => c.number === e.detail.number);
+      if (citation) {
+        console.log(`📚 Citation ${citation.number} clicked:`, citation);
+        // Pass excerpt for highlighting
+        pdfViewerRef.current?.goToPage(citation.source, citation.page, citation.excerpt);
+      }
+    };
+
+    // Listen for open-pdf events from sidebar
+    const handleOpenPDF = (e: CustomEvent<{ filename: string; page: number }>) => {
+      pdfViewerRef.current?.goToPage(e.detail.filename, e.detail.page);
+    };
+    
+    window.addEventListener('citation-click', handleCitationClick as EventListener);
+    window.addEventListener('open-pdf', handleOpenPDF as EventListener);
+    
+    return () => {
+      window.removeEventListener('citation-click', handleCitationClick as EventListener);
+      window.removeEventListener('open-pdf', handleOpenPDF as EventListener);
+    };
   }, [reset]);
+
+  const handleCitationClick = (source: string, page: number) => {
+    pdfViewerRef.current?.goToPage(source, page);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,8 +67,9 @@ export default function Home() {
     const userQuery = input;
     setInput('');
     setStreaming(true);
-    responseTextRef.current = '';
-    messageIdRef.current = null;
+    accumulatedText.current = '';
+    aiMessageIndex.current = -1;
+    citationsRef.current = [];
 
     try {
       const res = await fetch(`${API_URL}/ask`, {
@@ -47,45 +83,95 @@ export default function Home() {
       const { job_id } = await res.json();
       setJobId(job_id);
 
+      let fullResponse = '';
+
       eventSourceRef.current = connectSSE(job_id, {
         onToolCall: (message) => {
-          addMessage({ type: 'tool_call', content: message });
+          // Don't show "Found citations" message
+          if (!message.includes('Found citations')) {
+            addMessage({ type: 'tool_call', content: message });
+          }
         },
 
         onTextChunk: (text) => {
-          responseTextRef.current += text;
+          accumulatedText.current += text;
+          fullResponse += text;
           
-          // Create or update the streaming message
-          if (messageIdRef.current === null) {
-            // First chunk - add new message
-            const messages = useChatStore.getState().messages;
-            messageIdRef.current = messages.length;
-            addMessage({ type: 'text', content: responseTextRef.current });
+          const currentMessages = useChatStore.getState().messages;
+          
+          if (aiMessageIndex.current === -1) {
+            aiMessageIndex.current = currentMessages.length;
+            addMessage({ type: 'text', content: `AI: ${accumulatedText.current}` });
           } else {
-            // Update existing message
-            updateLastMessage(responseTextRef.current);
+            const newMessages = [...currentMessages];
+            newMessages[aiMessageIndex.current] = {
+              type: 'text',
+              content: `AI: ${accumulatedText.current}`
+            };
+            useChatStore.setState({ messages: newMessages });
           }
         },
 
         onCitation: (citation) => {
-          addMessage({
-            type: 'citation',
-            content: `${citation.source} (Page ${citation.page})`,
-          });
+          // Store citations but don't display as cards
+          citationsRef.current.push(citation);
+          console.log(`📚 Stored citation ${citation.number}:`, citation.source, 'page', citation.page);
         },
 
         onComponent: (componentData) => {
-          addMessage({ type: 'component', content: componentData });
+          addMessage({ type: 'component', content: JSON.stringify(componentData) });
         },
 
-        onEnd: () => {
+        onEnd: async () => {
+          try {
+            addMessage({ type: 'tool_call', content: '🎨 Generating visualization...' });
+            
+            // Get the first citation's page screenshot for better visualization
+            let imageBase64 = null;
+            if (citationsRef.current.length > 0) {
+              const firstCitation = citationsRef.current[0];
+              try {
+                const screenshotRes = await fetch(
+                  `${API_URL}/upload/pdf/${encodeURIComponent(firstCitation.source)}/screenshot?page=${firstCitation.page}`
+                );
+                if (screenshotRes.ok) {
+                  const screenshotData = await screenshotRes.json();
+                  imageBase64 = screenshotData.image;
+                  console.log('📸 Got PDF screenshot for vision analysis');
+                }
+              } catch (err) {
+                console.log('Could not get PDF screenshot, using text-only');
+              }
+            }
+            
+            const groqRes = await fetch('/api/groq-gen-ui', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                query: userQuery, 
+                context: fullResponse.substring(0, 3000),
+                imageBase64,
+                citations: citationsRef.current
+              }),
+            });
+
+            if (groqRes.ok) {
+              const uiComponent = await groqRes.json();
+              if (!uiComponent.error) {
+                addMessage({ type: 'component', content: JSON.stringify(uiComponent) });
+              }
+            }
+          } catch (err) {
+            console.error('Failed to generate UI:', err);
+          }
+
           setStreaming(false);
           if (eventSourceRef.current) {
             disconnectSSE(eventSourceRef.current);
             eventSourceRef.current = null;
           }
-          responseTextRef.current = '';
-          messageIdRef.current = null;
+          accumulatedText.current = '';
+          aiMessageIndex.current = -1;
         },
 
         onError: (error) => {
@@ -95,8 +181,6 @@ export default function Home() {
             disconnectSSE(eventSourceRef.current);
             eventSourceRef.current = null;
           }
-          responseTextRef.current = '';
-          messageIdRef.current = null;
         },
       });
     } catch (error) {
@@ -112,25 +196,24 @@ export default function Home() {
       eventSourceRef.current = null;
     }
     reset();
-    responseTextRef.current = '';
-    messageIdRef.current = null;
+    citationsRef.current = [];
   };
 
   return (
-    <div className="flex h-screen bg-white">
-      {/* Sidebar */}
+    <div className="flex h-screen bg-gray-100">
       <Sidebar />
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        <header className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-4 shadow-lg">
+        <header className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4 shadow-lg">
           <div className="max-w-4xl mx-auto">
-            <h1 className="text-3xl font-bold">Calquity</h1>
-            <p className="text-blue-100">AI Document Assistant with PDF Viewer</p>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              Calquity 🎨
+            </h1>
+            <p className="text-purple-100 text-sm">AI Document Assistant with Generative UI</p>
           </div>
         </header>
 
-        <ChatDisplay />
+        <ChatDisplay onCitationClick={handleCitationClick} />
 
         <div className="bg-white border-t border-gray-200 p-4 shadow-lg">
           <div className="max-w-4xl mx-auto">
@@ -139,21 +222,21 @@ export default function Home() {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask a question..."
+                placeholder="Ask about your documents... (click [1], [2] to view sources)"
                 disabled={isStreaming}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
               <button
                 type="submit"
                 disabled={isStreaming || !input.trim()}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-semibold transition"
+                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:opacity-90 disabled:bg-gray-400 font-semibold transition"
               >
-                {isStreaming ? 'Streaming...' : 'Ask'}
+                {isStreaming ? 'Generating...' : 'Ask'}
               </button>
               <button
                 type="button"
                 onClick={handleReset}
-                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition"
+                className="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
               >
                 Clear
               </button>
@@ -162,8 +245,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* PDF Viewer Overlay */}
-      <PDFViewer />
+      <PDFViewer ref={pdfViewerRef} />
     </div>
   );
 }

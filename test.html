@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Groq Generative UI Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .input-section {
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        input, select, button {
+            padding: 12px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        input, select {
+            flex: 1;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            min-width: 120px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+            font-size: 1.2em;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .ui-output {
+            min-height: 200px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        /* Generated UI Components */
+        .info-card {
+            flex: 1;
+            min-width: 250px;
+            padding: 25px;
+            border-radius: 15px;
+            border-left: 5px solid;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .info-card.blue {
+            background: #e3f2fd;
+            border-color: #2196F3;
+            color: #1565C0;
+        }
+
+        .info-card.green {
+            background: #e8f5e9;
+            border-color: #4CAF50;
+            color: #2E7D32;
+        }
+
+        .info-card.red {
+            background: #ffebee;
+            border-color: #f44336;
+            color: #c62828;
+        }
+
+        .info-card.yellow {
+            background: #fff9c4;
+            border-color: #FFEB3B;
+            color: #F57F17;
+        }
+
+        .info-card .icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .info-card .title {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .info-card .value {
+            font-size: 1.8em;
+            font-weight: bold;
+        }
+
+        .alert-box {
+            padding: 20px;
+            border-radius: 10px;
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .alert-box.warning {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            color: #856404;
+        }
+
+        .alert-box.error {
+            background: #f8d7da;
+            border: 2px solid #f44336;
+            color: #721c24;
+        }
+
+        .alert-box.success {
+            background: #d4edda;
+            border: 2px solid #4CAF50;
+            color: #155724;
+        }
+
+        .alert-box .icon {
+            font-size: 2em;
+        }
+
+        .chart-container {
+            padding: 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .bar-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+            height: 200px;
+            padding: 20px 0;
+        }
+
+        .bar {
+            flex: 1;
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            border-radius: 5px 5px 0 0;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .bar:hover {
+            transform: translateY(-5px);
+            opacity: 0.8;
+        }
+
+        .bar-label {
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.9em;
+            white-space: nowrap;
+        }
+
+        .bar-value {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-weight: bold;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎨 Groq Generative UI</h1>
+            <p>AI-Powered Dynamic Component Generation</p>
+        </div>
+
+        <div class="content">
+            <div class="input-section">
+                <div class="input-group">
+                    <input 
+                        type="text" 
+                        id="promptInput" 
+                        placeholder="e.g., Show me server statistics with 95% uptime"
+                        value="Show me server statistics with 95% uptime"
+                    >
+                    <button id="generateBtn" onclick="generateUI()">Generate UI</button>
+                </div>
+                
+                <div class="input-group">
+                    <select id="componentType">
+                        <option value="auto">Auto-detect</option>
+                        <option value="InfoCard">Info Card</option>
+                        <option value="Alert">Alert Box</option>
+                        <option value="BarChart">Bar Chart</option>
+                    </select>
+                    <button onclick="clearOutput()">Clear</button>
+                </div>
+            </div>
+
+            <div id="loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                Generating UI components...
+            </div>
+
+            <div id="uiOutput" class="ui-output"></div>
+        </div>
+    </div>
+
+    <script>
+        // Simulated Groq API call (replace with actual API endpoint)
+        async function callGroqAPI(prompt, componentType) {
+            // In production, this would call your backend API
+            // For demo purposes, we'll simulate the response
+            
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    // Simulate AI response based on prompt
+                    const responses = {
+                        'InfoCard': {
+                            component: 'InfoCard',
+                            props: {
+                                title: 'Server Uptime',
+                                value: '95%',
+                                icon: '🚀',
+                                color: 'green'
+                            }
+                        },
+                        'Alert': {
+                            component: 'Alert',
+                            props: {
+                                message: 'High CPU usage detected on server-01',
+                                type: 'warning',
+                                icon: '⚠️'
+                            }
+                        },
+                        'BarChart': {
+                            component: 'BarChart',
+                            props: {
+                                title: 'Monthly Revenue',
+                                data: [
+                                    { label: 'Jan', value: 45000 },
+                                    { label: 'Feb', value: 52000 },
+                                    { label: 'Mar', value: 48000 },
+                                    { label: 'Apr', value: 61000 }
+                                ]
+                            }
+                        }
+                    };
+
+                    // Auto-detect based on prompt keywords
+                    if (componentType === 'auto') {
+                        if (prompt.includes('alert') || prompt.includes('warning')) {
+                            componentType = 'Alert';
+                        } else if (prompt.includes('chart') || prompt.includes('data')) {
+                            componentType = 'BarChart';
+                        } else {
+                            componentType = 'InfoCard';
+                        }
+                    }
+
+                    resolve(responses[componentType]);
+                }, 1500);
+            });
+        }
+
+        function renderInfoCard(props) {
+            return `
+                <div class="info-card ${props.color}">
+                    <div class="icon">${props.icon}</div>
+                    <div class="title">${props.title}</div>
+                    <div class="value">${props.value}</div>
+                </div>
+            `;
+        }
+
+        function renderAlert(props) {
+            return `
+                <div class="alert-box ${props.type}">
+                    <div class="icon">${props.icon}</div>
+                    <div>${props.message}</div>
+                </div>
+            `;
+        }
+
+        function renderBarChart(props) {
+            const maxValue = Math.max(...props.data.map(d => d.value));
+            const bars = props.data.map(item => {
+                const height = (item.value / maxValue) * 100;
+                return `
+                    <div class="bar" style="height: ${height}%">
+                        <div class="bar-value">${item.value.toLocaleString()}</div>
+                        <div class="bar-label">${item.label}</div>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="chart-container" style="width: 100%;">
+                    <h3 style="margin-bottom: 20px;">${props.title}</h3>
+                    <div class="bar-chart">${bars}</div>
+                </div>
+            `;
+        }
+
+        async function generateUI() {
+            const prompt = document.getElementById('promptInput').value;
+            const componentType = document.getElementById('componentType').value;
+            const loading = document.getElementById('loading');
+            const output = document.getElementById('uiOutput');
+            const btn = document.getElementById('generateBtn');
+
+            if (!prompt.trim()) {
+                alert('Please enter a prompt');
+                return;
+            }
+
+            // Show loading
+            loading.style.display = 'block';
+            btn.disabled = true;
+
+            try {
+                // Call Groq API
+                const response = await callGroqAPI(prompt, componentType);
+
+                // Render component based on type
+                let html = '';
+                switch(response.component) {
+                    case 'InfoCard':
+                        html = renderInfoCard(response.props);
+                        break;
+                    case 'Alert':
+                        html = renderAlert(response.props);
+                        break;
+                    case 'BarChart':
+                        html = renderBarChart(response.props);
+                        break;
+                }
+
+                output.innerHTML = html;
+
+            } catch (error) {
+                output.innerHTML = `
+                    <div class="alert-box error">
+                        <div class="icon">❌</div>
+                        <div>Error: ${error.message}</div>
+                    </div>
+                `;
+            } finally {
+                loading.style.display = 'none';
+                btn.disabled = false;
+            }
+        }
+
+        function clearOutput() {
+            document.getElementById('uiOutput').innerHTML = '';
+        }
+
+        // Generate on Enter key
+        document.getElementById('promptInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') generateUI();
+        });
+
+        // Auto-generate on load
+        window.addEventListener('load', () => {
+            setTimeout(generateUI, 500);
+        });
+    </script>
+</body>
+</html>

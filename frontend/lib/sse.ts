@@ -1,98 +1,109 @@
-export interface SSECallbacks {
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+interface SSECallbacks {
   onToolCall: (message: string) => void;
   onTextChunk: (text: string) => void;
-  onCitation: (citation: { source: string; page: number }) => void;
-  onComponent: (componentData: string) => void;
+  onCitation: (citation: any) => void;
+  onComponent: (componentData: any) => void;
   onEnd: () => void;
   onError: (error: string) => void;
 }
 
-export function connectSSE(
-  jobId: string,
-  callbacks: SSECallbacks
-): EventSource {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+export function connectSSE(jobId: string, callbacks: SSECallbacks): EventSource {
   const url = `${API_URL}/stream/${jobId}`;
-
   console.log('🔌 Connecting to SSE:', url);
-  
-  const eventSource = new EventSource(url);
 
-  // Default message handler (for unnamed events and 'data')
+  const eventSource = new EventSource(url);
+  let hasEnded = false; // Track if stream ended normally
+
   eventSource.onmessage = (event) => {
-    console.log('📨 SSE message:', event.data);
-    
     try {
       const data = JSON.parse(event.data);
-      
-      // Handle text chunks
-      if (data.text) {
-        callbacks.onTextChunk(data.text);
-      }
-    } catch (error) {
-      console.error('Failed to parse SSE data:', error);
+      console.log('📩 SSE message:', data);
+    } catch {
+      // Plain text message
     }
   };
 
-  // Tool call events
-  eventSource.addEventListener('tool_call', (event: any) => {
-    console.log('🔧 Tool call:', event.data);
+  // Handle tool_call events
+  eventSource.addEventListener('tool_call', (event: MessageEvent) => {
     try {
       const data = JSON.parse(event.data);
-      callbacks.onToolCall(data.message);
-    } catch (error) {
-      console.error('Failed to parse tool_call:', error);
+      console.log('🔧 Tool call:', event.data);
+      callbacks.onToolCall(data.message || event.data);
+    } catch {
+      callbacks.onToolCall(event.data);
     }
   });
 
-  // Citation events
-  eventSource.addEventListener('citation', (event: any) => {
-    console.log('📚 Citation:', event.data);
+  // Handle text chunks
+  eventSource.addEventListener('text', (event: MessageEvent) => {
     try {
-      const data = JSON.parse(event.data);
-      callbacks.onCitation(data);
-    } catch (error) {
-      console.error('Failed to parse citation:', error);
+      const text = JSON.parse(event.data);
+      callbacks.onTextChunk(text);
+    } catch {
+      callbacks.onTextChunk(event.data);
     }
   });
 
-  // Component events
-  eventSource.addEventListener('component', (event: any) => {
-    console.log('📊 Component:', event.data);
+  // Handle citations
+  eventSource.addEventListener('citation', (event: MessageEvent) => {
     try {
-      const data = event.data;
-      callbacks.onComponent(data);
-    } catch (error) {
-      console.error('Failed to parse component:', error);
+      const citation = JSON.parse(event.data);
+      console.log('📚 Citation:', event.data);
+      callbacks.onCitation(citation);
+    } catch {
+      console.error('Failed to parse citation:', event.data);
     }
   });
 
-  // End event
-  eventSource.addEventListener('end', (event: any) => {
+  // Handle components
+  eventSource.addEventListener('component', (event: MessageEvent) => {
+    try {
+      const component = JSON.parse(event.data);
+      console.log('📊 Component:', event.data);
+      callbacks.onComponent(component);
+    } catch {
+      console.error('Failed to parse component:', event.data);
+    }
+  });
+
+  // Handle end event
+  eventSource.addEventListener('end', () => {
     console.log('✅ Stream ended');
+    hasEnded = true; // Mark as ended normally
     callbacks.onEnd();
+    eventSource.close();
   });
 
-  // Error events
-  eventSource.addEventListener('error', (event: any) => {
-    console.log('❌ SSE error:', event);
-    try {
-      const data = JSON.parse(event.data);
-      callbacks.onError(data.message);
-    } catch (error) {
-      callbacks.onError('Connection error');
+  // Handle error event from server
+  eventSource.addEventListener('error', (event: MessageEvent) => {
+    // This is a server-sent error event (different from connection error)
+    if (event.data) {
+      console.error('❌ Server error:', event.data);
+      callbacks.onError(event.data);
     }
   });
 
+  // Handle connection errors
   eventSource.onerror = (error) => {
-    console.error('❌ EventSource error:', error);
-    callbacks.onError('Connection failed');
+    // Only log error if stream hasn't ended normally
+    if (!hasEnded) {
+      console.error('❌ EventSource connection error:', error);
+      callbacks.onError('Connection failed');
+    } else {
+      // Stream ended normally, connection close is expected
+      console.log('🔌 SSE connection closed (normal)');
+    }
+    eventSource.close();
   };
 
   return eventSource;
 }
 
-export function disconnectSSE(eventSource: EventSource) {
-  console.log('🔌 Disconnecting SSE');
-  eventSource.close();
+export function disconnectSSE(eventSource: EventSource | null): void {
+  if (eventSource) {
+    console.log(' Disconnecting SSE');
+    eventSource.close();
+  }
 }

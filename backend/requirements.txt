@@ -6,3 +6,6 @@ rq redis
 sse-starlette
 sentence-transformers
 groq
+chromadb
+pypdf2
+pymupdf
