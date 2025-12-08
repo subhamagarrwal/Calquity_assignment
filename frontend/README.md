@@ -1,10 +1,15 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Calquity Assignment
 
+Models Used(through Groq API):
+Text LLM Used: llama-3.3-70b-versatile
+generating vizualizations: llama-4-scout
 ## Getting Started
 
 First, run the development server:
 
+### 1.Frontend
 ```bash
+cd frontend
 npm run dev
 # or
 yarn dev
@@ -13,12 +18,19 @@ pnpm dev
 # or
 bun dev
 ```
+### 2.Backend
+```bash
+cd ../backend
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+``` 
+
+
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
 
 ## Learn More
 
