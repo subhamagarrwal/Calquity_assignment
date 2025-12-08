@@ -41,9 +41,9 @@ export async function POST(req: NextRequest) {
     // If we have an image, use vision model for better analysis
     if (imageBase64) {
       console.log('🖼️ Using vision model for image analysis...');
-      
+
       const { text } = await generateText({
-        model: groq('meta-llama/llama-4-scout-17b-16e-instruct'),
+        model: groq('llama-3.2-90b-vision-preview'),
         messages: [
           {
             role: 'user',
@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
 User asked: "${query}"
 
 Based on the image, create a JSON response for a UI component:
+Ensure the design is minimalist and uses clean colors (e.g., blue, black, gray).
 
 Available components:
 1. InfoCard - For single key metrics
@@ -121,7 +122,8 @@ Rules:
 - Extract REAL data from context
 - Choose the most appropriate component
 - Use actual numbers, not placeholders
-- Respond with ONLY valid JSON`;
+- Respond with ONLY valid JSON
+- Ensure the design is minimalist and uses clean colors (e.g., blue, black, gray)`;
 
     const { text } = await generateText({
       model: groq('llama-3.3-70b-versatile'),
@@ -152,7 +154,7 @@ Rules:
 
   } catch (error: any) {
     console.error('❌ UI Generation error:', error);
-    
+
     // Return fallback on error
     return Response.json({
       component: 'InfoCard',

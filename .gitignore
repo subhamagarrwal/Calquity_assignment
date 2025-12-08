@@ -2,3 +2,5 @@
 /backend/node_modules
 /backend/services/__pycache__
 /backend/data/chromadb/
+/backend/__pycache__
+/frontend/node_modules
