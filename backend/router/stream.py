@@ -1,9 +1,9 @@
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from services.rag import rag_system
-from services.llm import llm_service
-from services.job_manager import job_manager
+from backend.services.rag import rag_system
+from backend.services.llm import llm_service
+from backend.services.job_manager import job_manager
 from typing import AsyncGenerator
 import json
 import asyncio

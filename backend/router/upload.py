@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query
 from fastapi.responses import JSONResponse, FileResponse
-from services.pdf_loader import pdf_loader
-from services.rag import rag_system
+from backend.services.pdf_loader import pdf_loader
+from backend.services.rag import rag_system
 import os
 import shutil
 import base64

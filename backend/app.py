@@ -1,18 +1,19 @@
 from dotenv import load_dotenv
 import os
-
 load_dotenv()
 print(f"GROQ_API_KEY loaded: {bool(os.getenv('GROQ_API_KEY'))}")
 print(f" GROQ_MODEL: {os.getenv('GROQ_MODEL')}")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from router.upload import router as upload_router
-from router.stream import router as stream_router
+from .router.upload import router as upload_router
+from .router.stream import router as stream_router
 import uvicorn
 import shutil
 import atexit
 import tempfile
+
+
 
 app = FastAPI(title="Calquity Backend")
 

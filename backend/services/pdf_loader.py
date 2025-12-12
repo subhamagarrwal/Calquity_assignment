@@ -39,11 +39,11 @@ class PDFLoader:
                         }
                     })
             
-            print(f"✓ Extracted {len(chunks)} chunks from {len(reader.pages)} pages")
+            print(f" Extracted {len(chunks)} chunks from {len(reader.pages)} pages")
             return chunks
         
         except Exception as e:
-            print(f"✗ Error extracting PDF: {str(e)}")
+            print(f"Error extracting PDF: {str(e)}")
             return []
 
 pdf_loader = PDFLoader()
