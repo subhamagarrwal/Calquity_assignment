@@ -1,7 +1,10 @@
 {
   "dependencies": {
-    "@ai-sdk/groq": "^2.0.32",
-    "ai": "^5.0.108",
-    "groq-sdk": "^0.37.0"
+    "@ai-sdk/groq": "^2.0.33",
+    "ai": "^5.0.112",
+    "groq-sdk": "^0.37.0",
+    "install": "^0.13.0",
+    "npm": "^11.7.0",
+    "react-markdown": "^10.1.0"
   }
 }

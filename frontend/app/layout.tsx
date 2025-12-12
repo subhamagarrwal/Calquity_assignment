@@ -1,23 +1,24 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { AIProvider } from "./providers/ai-provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Calquity - AI Document Assistant",
-  description: "AI-powered document analysis with generative UI",
+  title: "Calquity RAG",
+  description: "PDF Analysis with AI Visualizations",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className} suppressHydrationWarning>
-        {children}
+    <html lang="en">
+      <body className={inter.className}>
+        <AIProvider>{children}</AIProvider>
       </body>
     </html>
   );

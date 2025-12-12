@@ -6,8 +6,34 @@ import { connectSSE, disconnectSSE } from '@/lib/sse';
 import { ChatDisplay } from '@/components/ChatDisplay';
 import { PDFViewer, PDFViewerRef } from '@/components/PDFViewer';
 import { Sidebar } from '@/components/Sidebar';
+import { ChatInterface } from '@/components/chat/chat-interface';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+// Example PDF context (you'd get this from your backend)
+const samplePdfContext = `
+Annual Financial Report 2024
+
+Revenue by Quarter:
+- Q1: $2.5M
+- Q2: $3.1M
+- Q3: $2.8M
+- Q4: $4.2M
+
+Total Revenue: $12.6M (up 15% from 2023)
+
+Expense Breakdown:
+- Salaries: 45%
+- Marketing: 20%
+- Operations: 25%
+- R&D: 10%
+
+Key Metrics:
+- Gross Margin: 68%
+- Net Profit Margin: 22%
+- Customer Growth: +2,500 new customers
+- Employee Count: 150 (up from 120)
+`;
 
 export default function Home() {
   const [input, setInput] = useState('');
