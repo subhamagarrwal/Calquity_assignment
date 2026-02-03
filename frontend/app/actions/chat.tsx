@@ -12,9 +12,7 @@ import {
   StatCardComponent,
 } from '@/components/ui/charts';
 
-// ═══════════════════════════════════════════════════════════
-// TYPES
-// ═══════════════════════════════════════════════════════════
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -22,9 +20,7 @@ export interface Message {
   ui?: React.ReactNode;
 }
 
-// ═══════════════════════════════════════════════════════════
-// TOOL DEFINITIONS
-// ═══════════════════════════════════════════════════════════
+
 const tools = {
   // Bar Chart Tool
   renderBarChart: tool({
@@ -107,9 +103,7 @@ const tools = {
   }),
 };
 
-// ═══════════════════════════════════════════════════════════
-// RENDER TOOL RESULT TO COMPONENT
-// ═══════════════════════════════════════════════════════════
+
 function renderToolResult(result: any): React.ReactNode {
   switch (result.type) {
     case 'bar_chart':
@@ -134,9 +128,7 @@ function renderToolResult(result: any): React.ReactNode {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-// MAIN CHAT ACTION
-// ═══════════════════════════════════════════════════════════
+
 export async function chat(userMessage: string, context?: string) {
   const uiStream = createStreamableUI();
   const textStream = createStreamableValue('');
