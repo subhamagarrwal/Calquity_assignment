@@ -14,7 +14,6 @@ import atexit
 import tempfile
 
 
-
 app = FastAPI(title="Calquity Backend")
 
 # Define temp directory

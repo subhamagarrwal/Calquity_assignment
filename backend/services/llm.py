@@ -82,7 +82,7 @@ Provide a clear answer with inline citations like [1], [2], etc. referring to th
                     yield chunk.choices[0].delta.content
         
         except Exception as e:
-            yield f"\n\n❌ Error: {str(e)}"
+            yield f"\n\n Error: {str(e)}"
     
     def extract_citations(self, response_text: str, context_chunks: List[Dict]) -> List[Dict]:
         """Extract numbered citations from response"""
