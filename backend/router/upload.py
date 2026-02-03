@@ -75,7 +75,7 @@ async def list_documents():
         documents = [f for f in os.listdir(pdf_loader.calquity_dir) if f.endswith('.pdf')]
         return {"documents": documents, "count": len(documents)}
     except Exception as e:
-        print(f"✗ Error listing documents: {str(e)}")
+        print(f"Error listing documents: {str(e)}")
         return {"documents": [], "count": 0}
 
 @router.get("/pdf/{filename}")
