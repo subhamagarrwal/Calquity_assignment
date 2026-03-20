@@ -17,7 +17,6 @@ env/
 # Environment
 .env
 .env.local
-.env.*.local
 frontend/.env
 backend/.env
 
@@ -39,3 +38,6 @@ chroma_db/
 
 # OS
 Thumbs.db
+
+# temporary data
+backend/data/

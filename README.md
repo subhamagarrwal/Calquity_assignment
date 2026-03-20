@@ -34,9 +34,18 @@ uv run uvicorn backend.app:app --reload --host 0.0.0.0 --port 8000
 
 - Make sure you have a `.env` file in the project root with your GROQ_API_KEY and GROQ_MODEL.
 - The backend will be available at [http://localhost:8000](http://localhost:8000).
-
 ---
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the frontend.
 
 You can start editing the frontend by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+### 3. Environment Variables
+in the project root, create a `.env` file with the following content:
+
+```env
+GROQ_API_KEY = "your_groq_api_key_here"
+GROQ_MODEL = "llama-3.3-70b-versatile"
+```
+
+you can obtain your GROQ_API_KEY from the Groq dashboard after signing up and creating an API key.
